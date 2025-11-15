@@ -1,11 +1,11 @@
 """FastAPI integration for agent-state-bridge"""
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, List, Dict, Any
 from fastapi import APIRouter
-from .models import AgentRequest, AgentResponse
+from .models import AgentRequest, AgentResponse, Message, Action
 
 
 def create_agent_router(
-    agent_handler: Callable[[str, dict], Awaitable[str]],
+    agent_handler: Callable[[List[Message], List[Action], Dict[str, Any]], Awaitable[AgentResponse]],
     prefix: str = "",
     tags: list[str] = None
 ) -> APIRouter:
@@ -13,7 +13,8 @@ def create_agent_router(
     Create a FastAPI router with agent chat endpoint.
     
     Args:
-        agent_handler: Async function that takes (message, state) and returns response string
+        agent_handler: Async function that takes (messages, actions, context) 
+                      and returns AgentResponse
         prefix: Router prefix (default: "")
         tags: Router tags for OpenAPI docs
         
@@ -24,10 +25,12 @@ def create_agent_router(
         ```python
         from fastapi import FastAPI
         from agent_state_bridge.fastapi import create_agent_router
+        from agent_state_bridge.models import AgentResponse
         
-        async def my_agent(message: str, state: dict) -> str:
+        async def my_agent(messages, actions, context):
+            last_message = messages[-1].content if messages else ""
             # Your agent logic here
-            return f"Processed: {message}"
+            return AgentResponse(response=f"Processed: {last_message}")
         
         app = FastAPI()
         router = create_agent_router(my_agent, tags=["agent"])
@@ -38,9 +41,20 @@ def create_agent_router(
     
     @router.post("/chat", response_model=AgentResponse)
     async def chat_endpoint(request: AgentRequest) -> AgentResponse:
-        """Agent chat endpoint"""
-        response = await agent_handler(request.message, request.state)
-        return AgentResponse(response=response)
+        """
+        Agent chat endpoint.
+        
+        Accepts:
+        - messages: Conversation history
+        - actions: Recent state mutations (CRUD operations)
+        - context: Application state and RAG data
+        
+        Returns:
+        - response: Agent message
+        - actions: Optional actions to execute
+        - context: Optional updated context
+        """
+        return await agent_handler(request.messages, request.actions, request.context)
     
     return router
 
@@ -54,13 +68,15 @@ class AgentBridge:
         ```python
         from fastapi import FastAPI
         from agent_state_bridge.fastapi import AgentBridge
+        from agent_state_bridge.models import AgentResponse
         
         app = FastAPI()
         bridge = AgentBridge(app)
         
         @bridge.agent_handler
-        async def my_agent(message: str, state: dict) -> str:
-            return f"Got: {message}"
+        async def my_agent(messages, actions, context):
+            last_msg = messages[-1].content if messages else ""
+            return AgentResponse(response=f"Got: {last_msg}")
         ```
     """
     
@@ -71,7 +87,7 @@ class AgentBridge:
         if app:
             self.init_app(app)
     
-    def agent_handler(self, func: Callable[[str, dict], Awaitable[str]]):
+    def agent_handler(self, func: Callable[[List[Message], List[Action], Dict[str, Any]], Awaitable[AgentResponse]]):
         """Decorator to register agent handler"""
         self._handler = func
         return func

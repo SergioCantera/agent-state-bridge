@@ -2,7 +2,7 @@
 
 **Full-stack bridge for sharing app state between frontend and AI agents.** Includes React hooks/components (npm) and Python backend utilities (PyPI) for FastAPI, Flask, and Django.
 
-> 🚀 Build AI-powered apps with seamless state synchronization between your frontend and backend agents.
+> 🚀 Build AI-powered apps with seamless state synchronization. **New in v0.2.0**: `{messages, actions, context}` model separates CRUD operations from state, ready for RAG integration.
 
 ---
 
@@ -10,10 +10,10 @@
 
 This monorepo contains two complementary packages:
 
-| Package | Platform | Description |
-|---------|----------|-------------|
-| **agent-state-bridge** | npm | React hooks and UI components for frontend |
-| **agent-state-bridge** | PyPI | Python utilities for FastAPI, Flask, Django |
+| Package                | Platform | Description                                 |
+| ---------------------- | -------- | ------------------------------------------- |
+| **agent-state-bridge** | npm      | React hooks and UI components for frontend  |
+| **agent-state-bridge** | PyPI     | Python utilities for FastAPI, Flask, Django |
 
 ---
 
@@ -34,9 +34,17 @@ import { useAgentChat } from "agent-state-bridge";
 
 const { messages, sendMessage, loading, error } = useAgentChat({
   endpoint: "http://localhost:8000/chat",
-  getState: () => myAppState, // Any state manager (Zustand, Redux, useState, etc.)
+  getContext: () => myAppState, // App state + RAG data
+  getActions: () => recentActions, // Optional: recent CRUD operations
+  onActionsReceived: (actions) => executeActions(actions), // Optional: handle agent actions
 });
 ```
+
+**New in v0.2.0:** Separates concerns for better scalability:
+
+- `getContext`: Application state and RAG context
+- `getActions`: Recent state mutations (CRUD operations)
+- `onActionsReceived`: Execute actions returned by the agent
 
 #### 2. Ready-to-use chat component
 
@@ -50,7 +58,7 @@ import { AgentChatSidebar } from "agent-state-bridge";
   error={error}
   open={open}
   onClose={() => setOpen(false)}
-/>
+/>;
 ```
 
 ### Features
@@ -58,7 +66,7 @@ import { AgentChatSidebar } from "agent-state-bridge";
 ✅ **State-agnostic**: Works with Zustand, Redux, useState, useContext, etc.  
 ✅ **UI included**: Pre-built chat component with markdown support  
 ✅ **Customizable**: Use hooks only or customize the UI  
-✅ **TypeScript**: Fully typed  
+✅ **TypeScript**: Fully typed
 
 📖 [Full Frontend Documentation →](./src/)
 
@@ -86,16 +94,38 @@ pip install agent-state-bridge[django]
 ```python
 from fastapi import FastAPI
 from agent_state_bridge.fastapi import create_agent_router
+from agent_state_bridge.models import AgentResponse, Message, Action
 
-async def my_agent(message: str, state: dict) -> str:
-    """Your agent logic here"""
-    cart_items = state.get("cart", {}).get("items", [])
-    return f"You have {len(cart_items)} items. You said: {message}"
+async def my_agent(messages: list[Message], actions: list[Action], context: dict) -> AgentResponse:
+    """
+    New v0.2.0 model: {messages, actions, context}
+    - messages: Conversation history
+    - actions: Recent CRUD operations (post, put, delete)
+    - context: App state + RAG data
+    """
+    cart_items = context.get("cart", {}).get("items", [])
+    last_msg = messages[-1].content if messages else ""
+
+    response_text = f"You have {len(cart_items)} items. You said: {last_msg}"
+
+    # Optionally return actions for the frontend to execute
+    return AgentResponse(
+        response=response_text,
+        actions=[Action(type="post", payload={"product": "suggested_item"})],  # Optional
+        context={"updated": "data"}  # Optional
+    )
 
 app = FastAPI()
 router = create_agent_router(my_agent, tags=["agent"])
 app.include_router(router)
 ```
+
+**Why this model?**
+
+- ✅ Separates state mutations (actions) from context
+- ✅ Ready for RAG: Add vector search results to context
+- ✅ Bidirectional actions: Agent can return actions for frontend to execute
+- ✅ Scalable: Easy to add query agents and semantic search
 
 #### Flask
 
@@ -126,7 +156,7 @@ def my_agent(message: str, state: dict) -> str:
 ✅ **LangChain**: Full async support  
 ✅ **Microsoft Agent Framework**: Azure AI integration  
 ✅ **CrewAI**: Multi-agent orchestration  
-✅ **Custom agents**: Bring your own logic  
+✅ **Custom agents**: Bring your own logic
 
 📖 [Full Backend Documentation →](./python/)  
 📁 [Examples with LangChain, Agent Framework, etc. →](./python/examples/)
@@ -178,12 +208,12 @@ import { useStore } from "./store"; // Zustand, Redux, or any state manager
 export function MyChat() {
   const [open, setOpen] = useState(false);
   const cart = useStore((s) => s.cart);
-  
+
   const { messages, sendMessage, loading, error } = useAgentChat({
     endpoint: "http://localhost:8000/chat",
     getState: () => ({ cart }),
   });
-  
+
   return (
     <>
       <button onClick={() => setOpen(true)}>Open Chat</button>
@@ -206,22 +236,35 @@ export function MyChat() {
 ```python
 from fastapi import FastAPI
 from agent_state_bridge.fastapi import create_agent_router
+from agent_state_bridge.models import AgentResponse, Message, Action
 from langchain_openai import ChatOpenAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain.schema import HumanMessage, SystemMessage, AIMessage
 
 llm = ChatOpenAI(model="gpt-4o-mini")
 
-async def langchain_agent(message: str, state: dict) -> str:
-    cart_items = state.get("cart", {}).get("items", [])
-    context = f"User has {len(cart_items)} items in cart."
-    
-    messages = [
-        SystemMessage(content=f"You are a shopping assistant. {context}"),
-        HumanMessage(content=message)
-    ]
-    
-    response = await llm.ainvoke(messages)
-    return response.content
+async def langchain_agent(messages: list[Message], actions: list[Action], context: dict) -> AgentResponse:
+    cart_items = context.get("cart", {}).get("items", [])
+    products = context.get("products", [])
+
+    # Build context with cart and products
+    context_text = f"Cart: {len(cart_items)} items. Available products: {len(products)}"
+
+    # Convert to LangChain messages
+    lc_messages = [SystemMessage(content=f"You are a shopping assistant. {context_text}")]
+    for msg in messages:
+        if msg.role == "user":
+            lc_messages.append(HumanMessage(content=msg.content))
+        elif msg.role == "assistant":
+            lc_messages.append(AIMessage(content=msg.content))
+
+    response = await llm.ainvoke(lc_messages)
+
+    # Return response with optional actions
+    return AgentResponse(
+        response=response.content,
+        actions=None,  # Could return actions for frontend to execute
+        context=None   # Could return updated context
+    )
 
 app = FastAPI()
 router = create_agent_router(langchain_agent, tags=["agent"])
@@ -237,11 +280,16 @@ app.include_router(router)
 #### `useAgentChat(options)`
 
 **Options:**
+
 - `endpoint`: string (default: "/chat") - Backend endpoint URL
-- `getState`: () => any (required) - Function returning current app state
+- `getContext`: () => any (required) - Function returning current app state and RAG data
+- `getActions`: () => Action[] (optional) - Function returning recent CRUD operations
+- `onActionsReceived`: (actions: Action[]) => void (optional) - Handle actions from agent
+- `onContextUpdated`: (context: any) => void (optional) - Handle context updates
 - `initialMessages`: Message[] (optional) - Initial chat messages
 
 **Returns:**
+
 - `messages`: Message[] - Chat message history
 - `sendMessage`: (msg: string) => Promise<void> - Send message to agent
 - `loading`: boolean - Request in progress
@@ -250,20 +298,26 @@ app.include_router(router)
 #### `<AgentChatSidebar>`
 
 **Props:**
+
 - `messages`, `onSend`, `loading`, `error`, `open`, `onClose` (required)
 - `title`, `placeholder`, `sendLabel`, `className`, `style` (optional)
 
 ### Backend (PyPI)
 
 #### FastAPI
+
 - `create_agent_router(handler, prefix="", tags=[])` - Create router with `/chat` endpoint
+  - `handler`: async function with signature `(messages, actions, context) -> AgentResponse`
 - `AgentBridge` - Class-based approach with decorators
+- **Models**: `AgentRequest`, `AgentResponse`, `Message`, `Action`
 
 #### Flask
+
 - `create_agent_blueprint(handler, name="agent", url_prefix="")` - Create blueprint
 - `@agent_route` - Decorator for route handlers
 
 #### Django
+
 - `@agent_api_view` - Decorator for function-based views
 - `AgentAPIView` - Base class for class-based views
 
@@ -281,9 +335,13 @@ graph LR
 ```
 
 **Key principles:**
+
 - Frontend is the source of truth for state
 - Backend is stateless (no session storage)
-- State is sent with every request
+- **Separation of concerns**: Actions (CRUD) vs Context (state + RAG)
+- Messages, actions, and context sent with every request
+- Agent can return actions for frontend to execute
+- Ready for RAG: Add vector search results to context
 - Works with any AI framework
 
 📖 [Architecture Documentation →](./ARQUITECTURA_ESTADO.md)
