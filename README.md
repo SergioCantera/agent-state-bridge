@@ -348,6 +348,19 @@ graph LR
 
 ---
 
+## 📚 Examples
+
+Check out complete working examples in the [examples/](./examples/) directory:
+
+- **[Shopping Cart](./examples/shopping-cart/)** - Full-stack e-commerce with AI assistant
+  - React + Zustand + LangChain
+  - Demonstrates `{messages, actions, context}` model
+  - RAG-ready architecture
+
+[View all examples →](./examples/)
+
+---
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
