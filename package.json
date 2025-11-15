@@ -1,0 +1,50 @@
+{
+  "name": "agent-state-bridge",
+  "version": "0.1.0",
+  "description": "Bridge for sharing app state and chat with Python agent backend.",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "zustand": ">=4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.5",
+    "react": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "typescript": "^5.9.3"
+  },
+  "keywords": [
+    "agent",
+    "state",
+    "chat",
+    "python",
+    "fastapi",
+    "react",
+    "zustand"
+  ],
+  "author": "SergioCantera",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SergioCantera/agent-state-bridge.git"
+  },
+  "homepage": "https://github.com/SergioCantera/agent-state-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/SergioCantera/agent-state-bridge/issues"
+  }
+}
