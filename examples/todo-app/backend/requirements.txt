@@ -1,0 +1,13 @@
+# Todo Assistant Backend Requirements
+
+# Core dependencies
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+python-dotenv>=1.0.0
+
+# Agent State Bridge
+agent-state-bridge[fastapi]>=0.2.0
+
+# LangChain and AI
+langchain-openai>=0.1.0
+langchain-core>=0.2.0

@@ -35,13 +35,13 @@ npm run dev
   {
     "name": "Waffle with Berries",
     "category": "Waffle",
-    "price": 6.50,
+    "price": 6.5,
     "image": "/images/waffle.jpg"
   },
   {
     "name": "Vanilla Bean Crème Brûlée",
     "category": "Crème Brûlée",
-    "price": 7.00,
+    "price": 7.0,
     "image": "/images/creme-brulee.jpg"
   }
 ]
@@ -50,7 +50,7 @@ npm run dev
 ## Usage
 
 ```jsx
-import { AgentChat } from './AgentChat';
+import { AgentChat } from "./AgentChat";
 
 function App() {
   return (

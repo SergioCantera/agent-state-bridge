@@ -62,24 +62,24 @@ npm run dev
 ```javascript
 // Frontend hook
 const { messages, sendMessage } = useAgentChat({
-  endpoint: 'http://localhost:8000/chat',
-  
+  endpoint: "http://localhost:8000/chat",
+
   // Context: App state + RAG data (could include vector search results)
   getContext: () => ({
     products: availableProducts,
-    cart: currentCartState
+    cart: currentCartState,
   }),
-  
+
   // Actions: Recent CRUD operations (optional, for tracking)
   getActions: () => recentActions,
-  
+
   // Handle actions returned by agent
   onActionsReceived: (actions) => {
-    actions.forEach(action => {
-      if (action.type === 'post') addToCart(action.payload.productName);
-      if (action.type === 'delete') removeFromCart(action.payload.productName);
+    actions.forEach((action) => {
+      if (action.type === "post") addToCart(action.payload.productName);
+      if (action.type === "delete") removeFromCart(action.payload.productName);
     });
-  }
+  },
 });
 ```
 
@@ -96,10 +96,10 @@ async def shopping_agent(
     # Access full context
     cart = context.get('cart', {})
     products = context.get('products', [])
-    
+
     # Build response using LangChain
     response_text = await build_response(messages, cart, products)
-    
+
     # Optionally return actions for frontend to execute
     return AgentResponse(
         response=response_text,
@@ -111,6 +111,7 @@ async def shopping_agent(
 ### 3. Why This Model?
 
 **Before (v0.1.0):**
+
 ```python
 async def agent(message: str, state: dict) -> str:
     # Everything mixed together
@@ -119,6 +120,7 @@ async def agent(message: str, state: dict) -> str:
 ```
 
 **After (v0.2.0):**
+
 ```python
 async def agent(messages, actions, context) -> AgentResponse:
     # ✅ Message history separate
